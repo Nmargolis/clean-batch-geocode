@@ -1,12 +1,13 @@
 import csv
 import re
+from geocode import geocode_address
 
 
 def read_file(source_file, output_file):
     with open(source_file) as csv_source_file:
         with open(output_file, 'w') as csv_output_file:
 
-            fieldnames = ['street_address', 'city', 'unit', 'date_issued', 'clean_address', 'extras']
+            fieldnames = ['street_address', 'city', 'unit', 'date_issued', 'clean_address', 'extras', 'geocode_status', 'geocode_place_name', 'lat', 'lon']
 
             reader = csv.DictReader(csv_source_file)
             writer = csv.DictWriter(csv_output_file, fieldnames=fieldnames)
@@ -15,7 +16,7 @@ def read_file(source_file, output_file):
             i = 0
 
             # Number of rows to test on
-            n = 100
+            n = 300
 
             writer.writeheader()
 
@@ -82,17 +83,44 @@ def read_file(source_file, output_file):
                 if extra:
                     extra = extra.strip(punct_to_strip)
 
-                print "clean_address: {}".format(', '.join([clean_address, row['city'], 'CA']))
-                if extra:
-                    print "extra: {}".format(extra)
+                clean_address = ', '.join([clean_address, row['city'], 'CA'])
+
+                # if extra:
+                #     print "extra: {}".format(extra)
+
+                # Geocode address and set row variables
+                geocode_result = geocode_address(clean_address)
+
+                # 'geocode_status', 'geocode_place_name', 'lat', 'lon'
+                if geocode_result:
+                    if float(geocode_result['relevance']) >= 0.9:
+                        geocode_status = "SUCCESS"
+                    else:
+                        geocode_status = "CHECK"
+
+                    geocode_place_name = geocode_result['place_name']
+                    lat = geocode_result['lat']
+                    lon = geocode_result['lon']
+
+                else:
+                    geocode_status = "FAILED"
+                    geocode_place_name = None
+                    lat = None
+                    lon = None
+
+                print "{} {}".format(clean_address, geocode_status)
 
                 writer.writerow({
                     'street_address': row['street_address'],
                     'city': row['city'],
                     'unit': row['unit'],
                     'date_issued': row['date_issued'],
-                    'clean_address': ', '.join([clean_address, row['city'], 'CA']),
-                    'extras': extra
+                    'clean_address': clean_address,
+                    'extras': extra,
+                    'geocode_status': geocode_status,
+                    'geocode_place_name': geocode_place_name,
+                    'lat': lat,
+                    'lon': lon
                     })
     csv_output_file.close()
     csv_source_file.close()
